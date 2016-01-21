@@ -1,0 +1,403 @@
+\documentclass[9pt]{beamer}
+
+% \usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\graphicspath{ {images/} }
+
+\usetheme{Goettingen}
+
+
+\title{Обзор библиотеки ros tf}
+
+% A subtitle is optional and this may be deleted
+% \subtitle{Optional Subtitle}
+
+% \author{Денис Шепелев\inst{1}}
+\author{Денис Шепелев}
+
+% - Give the names in the same order as the appear in the paper.
+% - Use the \inst{?} command only if the authors have different
+%   affiliation.
+
+\institute[] % (optional, but mostly needed)
+{
+  % \inst{1}%
+  % 073а\\
+}
+% - Use the \inst command only if there are several affiliations.
+% - Keep it simple, no one is interested in your street address.
+
+\date{ }
+% \date{}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\section{Как работает tf}
+
+\subsection{Задачи и структура tf}
+
+\begin{frame}{Задачи и структура tf}
+  Основные задачи tf
+  \begin{itemize}
+    \item
+    {
+      обеспечить надежную и эффективную работу в распределенной системе
+    }
+    \item
+    {
+      простоту изменения и получения данных
+    }
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Задачи и структура tf}
+  \begin{itemize}
+    \item
+    {
+      Основная структура - граф
+    }
+    \item
+    {
+      Вершина - система координат (frame)
+    }
+    \item
+    {
+      Ребро - преобразование (transform) между соединенными этим ребром фреймами
+    }
+  \end{itemize}
+
+  Никаких явных ограничений на граф нет, однако рекомендуется
+  \begin{itemize}
+    \item
+    {
+      чтобы граф был связный
+    }
+    \item
+    {
+      и ацикличный
+    }
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Задачи и структура tf}
+Типичный запрос в tf выглядит следующим образом:
+\begin{itemize}
+    \item
+    {
+      Получить преобразование transform между parent и child фреймами в момент времени t
+    }
+  \end{itemize}
+
+Поэтому для каждого ребра в хронологическом порядке хранится история его изменений в течение некоторого промежутка времени. 
+
+\end{frame}
+
+\subsection{Listener и Broadcaster}
+
+\begin{frame}{Listener и Broadcaster}
+Основные компоненты для работы с tf
+\begin{itemize}
+    \item
+    {
+      Broadcaster - периодически отправлять данные в tf
+    }
+    \item
+    {
+      Listener - собирает данные, которые приходят в tf, и работает с запросами
+    }
+  \end{itemize}
+
+\end{frame}
+
+\begin{frame}{Listener и Broadcaster}
+Следует отметить, что Listener разрешает запросы используя интерполяцию (SLERP = spherical linear interpolation). Поэтому
+\begin{itemize}
+    \item
+    {
+      необходимо обеспечить достаточную быструю частоту публикаций данных
+    }
+    \item
+    {
+      с учетом пропускной способности сети
+    }
+  \end{itemize}
+
+Благодаря интерполяции система может работать асинхронно, вдобавок повышая устойчивость в случае потери данных.
+
+\end{frame}
+
+\begin{frame}{Listener и Broadcaster}
+Механизм разрешения запроса
+\begin{itemize}
+    \item
+    {
+      Listener гуляет по графу, формируя остовное дерево содержащее child и parent
+    }
+    \item
+    {
+      Если parent не найдено, будет получено соответствующее исключение
+    }
+    \item
+    {
+      Если остовное дерево сформировано, то вдоль ребер, лежащих на пути между child и parent, ищется преобразование между целевыми фреймами
+    }
+    \item
+    {
+      На каждом ребре ищется интерполяция в момент времени, заданный в запросе, используя 2 ближайших по времени преобразования. Если все они существуют, то между фреймами $a$ и $c$, между которыми в графе лежит фрейм $b$, преобразование может быть найдено по формуле
+      $$T^c_a = T^b_a \ast T^c_b $$ 
+    }
+  \end{itemize}
+\end{frame}
+
+\section{Работа с tf}
+
+\subsection{Data}
+
+\begin{frame}{Data}
+Основные структуры, которыми оперирует tf
+  \begin{itemize}
+    \item
+    {
+      tf::Quaternion
+    }
+    \item
+    {
+      tf::Vector3
+    }
+    \item
+    {
+      tf::Point
+    }
+    \item
+    {
+      tf::Pose
+    }
+    \item
+    {
+      tf::Transform
+    }
+    \item
+    {
+     tf::Stamped <T>
+    }
+    \item
+    {
+     tf::StampedTransform
+    }
+  \end{itemize}
+
+Стоит отдельно отметить полезную функцию 
+
+tf::Quaternion createQuaternionFromRPY(double roll,double pitch,double yaw)
+\end{frame}
+
+\subsection{Broadcaster}
+
+
+\begin{frame}{Broadcaster}
+Для того чтобы отправить преобразование достаточно сделать следующее
+  \begin{itemize}
+    \item
+    {
+      tf::TransformBroadcaster()
+    }
+    \item
+    {
+      void sendTransform(const StampedTransform \& transform) - отправляет преобразование
+    }
+  \end{itemize}
+\end{frame}
+
+\subsection{Listener}
+
+\begin{frame}{Listener}
+И наконец, для того чтобы можно было посылать запросы системе используется 
+  \begin{itemize}
+    \item
+    {
+      tf::TransformListener
+    }
+    \item
+    {
+      bool canTransform(...) - проверяет, может ли преобразование быть найдено
+    }
+    \item
+    {
+      bool waitForTransform(...) - блокирует исполнение, на некоторый промежуток времени, пока преобразование не будет найдено, или не закончится время 
+    }
+    \item
+    {
+      void lookupTransform(...) - находит преобразование, в случае неудачи выбрасывает исключение
+    }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Listener}
+Также Listener предоставляет возможность преобразовывать данные между фреймами, такие как Quaternion, Vector3, Pose и т.д.
+  \begin{itemize}
+    \item
+    {
+      void tf::TransformListener::transformDATATYPE(...)
+    }
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Исключения}
+Некоторые методы выбрасывают исключения, которые наследуются от tf::TransformException 
+  \begin{itemize}
+    \item
+    {
+      tf::ConnectivityException - если 2 фрейма не принадлежат одному связанному графу
+    }
+    \item
+    {
+      tf::ExtrapolationException - если между 2 фреймами одно и более устаревших связей
+    }
+    \item
+    {
+      tf::InvalidArgument - при неправильных аргументах
+    }
+    \item
+    {
+      tf::LookupException - если в запросе один из фреймов не существует 
+    }
+  \end{itemize}
+\end{frame}
+
+\section{Инструменты командной строки}
+\subsection{Инструменты командной строки}
+
+\begin{frame}{Инструменты командной строки}
+Основные инструменты командной строки 
+  \begin{itemize}
+    \item
+    {
+      view\_frames - визуализирует в pdf структуру графа tf
+    }
+    \item
+    {
+      tf\_monitor - мониторит преобразования между фреймами (всеми, либо 2 заданными) 
+    }
+    \item
+    {
+      tf\_echo - выводит преобразование между 2 заданными фреймами
+    }
+    \item
+    {
+      roswtf - клевая тулза которая позволяет найти много разных проблем в ros, в том числе и tf, например, выведет предупреждение о том, что граф не связный
+    }
+    \item
+    {
+      static\_transform\_publisher - позволяет публиковать статическое преобразование
+    }
+  \end{itemize}
+\end{frame}
+
+\section{Возможные проблемы}
+\subsection{Возможные проблемы}
+
+\begin{frame}{Возможные проблемы}
+Возможные проблемы при работе с tf
+  \begin{itemize}
+    \item
+    {
+      \textcolor{red}{Проблема} - Некоторые ноды ros могут публиковать в tf противоречивую информацию (циклы в графе, несвязный граф).
+
+      \textcolor{green}{Решение} - Искать баг с помощью инструментов командной строки, в самом начале разработки внимательно следить и регулировать кто что публикует.
+    }
+    \item
+    {
+      \textcolor{red}{Проблема} - tf ругается на устаревшие данные.
+
+      \textcolor{green}{Решение} - Возможно вы запустили rosbag play и забыли прописать --clock или /use\_sim\_time = true в rosparam.
+    }
+    \item
+    {
+      \textcolor{red}{Проблема} - Сообщения приходят быстрее чем, обновляется информация в tf. 
+
+      \textcolor{green}{Решение} - Использовать waitForTransform или tf::MessageFilter
+    }
+  \end{itemize}
+\end{frame}
+
+
+% \begin{frame}{2D карта}
+% \begin{columns}
+%   \begin{column}{0.50\textwidth}
+%     \begin{itemize}
+%       \item
+%       {
+%         Карта - обычное изображение
+%       }
+%       \item
+%       {
+%         Каждый пиксель - некоторая область пространства
+%       }
+%       \item
+%       {
+%         Белый пиксель - свободная для движения область
+%       }
+%       \item
+%       {
+%         Черный - чем-то занятая облать
+%       }
+%       \item
+%       {
+%         Серый - неизвестная область
+%       }
+%     \end{itemize}
+%   \end{column}
+%   % \begin{column}{0.50\textwidth}
+%   %   \begin{figure}[h]
+%   %     \centering
+%   %     \includegraphics[width=0.8\textwidth]{grid_map.png}
+%   %   \end{figure}
+%   % \end{column}
+% \end{columns}
+% \end{frame}
+
+
+
+% \begin{frame}{Name}
+% \begin{itemize}
+%   \item
+%   {
+      
+%   }
+% \end{itemize}
+% \end{frame}
+
+
+% All of the following is optional and typically not needed. 
+\appendix
+\section<presentation>*{\appendixname}
+\subsection<presentation>*{Источники}
+
+\begin{frame}[allowframebreaks]
+  \frametitle<presentation>{Источники}
+    
+  \begin{thebibliography}{10}
+    
+  \beamertemplatearticlebibitems
+  % Followed by interesting articles. Keep the list short. 
+
+  \bibitem{tf}
+    \newblock {TF}
+    \newblock {\em http://wiki.ros.org/tf}
+
+
+  \end{thebibliography}
+\end{frame}
+
+\end{document}
+
+
