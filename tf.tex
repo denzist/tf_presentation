@@ -324,7 +324,13 @@ tf::Quaternion createQuaternionFromRPY(double roll,double pitch,double yaw)
     {
       \textcolor{red}{Проблема} - Сообщения приходят быстрее чем, обновляется информация в tf. 
 
-      \textcolor{green}{Решение} - Использовать waitForTransform или tf::MessageFilter
+      \textcolor{green}{Решение} - Использовать waitForTransform, если известна величина задержки и она не изменяется.
+    }
+    \item
+    {
+      \textcolor{red}{Проблема} - Нужно привязать (преобразовать) сообщения с Header к преобразованию в tf. 
+
+      \textcolor{green}{Решение} - Использовать waitForTransform или tf::MessageFilter.
     }
   \end{itemize}
 \end{frame}
